@@ -1,55 +1,72 @@
 import pygame
+import copy
 
 ARROW_PRESSED = [pygame.K_LEFT, pygame.K_RIGHT, pygame.K_UP, pygame.K_DOWN]
 NUM_PRESSED = [pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4, pygame.K_5, pygame.K_6, pygame.K_7, pygame.K_8, pygame.K_9]
 map_key_to_number = {pygame.K_1 : 1, pygame.K_2 : 2, pygame.K_3 : 3, pygame.K_4 : 4, pygame.K_5 : 5, pygame.K_6 : 6, pygame.K_7 : 7, pygame.K_8 : 8, pygame.K_9 : 9}
 
-WINDOW_SIZE = 600
+WINDOW_WIDTH = 700
+WINDOW_HEIGHT = 510
 SUDOKU_SIZE = 500
 NUMBER_FONT_SIZE = 40
 diff = SUDOKU_SIZE / 9
-THICK_LINE = 6
+THICK_LINE = 3
+BOARD_OFFSET = 3
 
+# Initialize pygame
 pygame.font.init()
-Window = pygame.display.set_mode((WINDOW_SIZE, WINDOW_SIZE))
+Window = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
 pygame.display.set_caption("SUDOKU GAME")
 font = pygame.font.SysFont("comicsans", NUMBER_FONT_SIZE)
 
 class SudokuBoard:
     x_coord = 0
     y_coord = 0
+    exit_game = False
+    highlight_flag = False
     defaultgrid =[
-        [1, 2, 3, 4, 5, 6, 7, 8, 9],
-        [7, 8, 0, 4, 0, 0, 0, 2, 0],
-        [0, 0, 2, 6, 0, 1, 0, 7, 8],
-        [6, 1, 0, 0, 7, 5, 0, 0, 9],
-        [0, 0, 7, 5, 4, 0, 0, 6, 1],
-        [0, 0, 1, 7, 5, 0, 9, 3, 0],
-        [0, 7, 0, 3, 0, 0, 0, 1, 0],
-        [0, 4, 0, 2, 0, 6, 0, 0, 7],
-        [0, 2, 0, 0, 0, 7, 4, 0, 0],
+        [0, 0, 1, 0, 0, 0, 0, 0, 9],
+        [0, 0, 0, 0, 0, 1, 5, 0, 2],
+        [0, 7, 6, 5, 0, 0, 0, 8, 0],
+        [0, 0, 0, 0, 6, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 4, 0, 0, 0],
+        [0, 4, 0, 0, 0, 0, 3, 9, 1],
+        [0, 8, 2, 0, 0, 7, 0, 0, 0],
+        [0, 9, 7, 0, 3, 0, 0, 0, 6],
+        [4, 0, 0, 8, 9, 0, 0, 0, 0],
     ]
+    updatedgrid = copy.deepcopy(defaultgrid)
 
 
     def coord(self, pos):
         '''Set x and y coordinates'''
-        self.x_coord = pos[0]//diff
-        self.y_coord = pos[1]//diff
+        max_pos = 9
+        x_pos = int(pos[0]//diff)
+        y_pos = int(pos[1]//diff)
+
+        if x_pos >= max_pos or y_pos >= max_pos:
+            return
+
+        self.highlight_flag = True
+        self.x_coord = x_pos
+        self.y_coord = y_pos
 
 
-def valid_value(m, k, l, value):
-    for it in range(9):
-        if m[k][it]== value:
-            return False
-        if m[it][l]== value:
-            return False
-    it = k//3
-    jt = l//3
-    for k in range(it * 3, it * 3 + 3):
-        for l in range (jt * 3, jt * 3 + 3):
-            if m[k][l]== value:
-                return False
-    return True
+def handle_events(sudoku_board):
+    '''Given a mouse/keyboard event handle it here'''
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            sudoku_board.exit_game = True
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            handle_mouse_event(sudoku_board)
+        elif event.type == pygame.KEYDOWN:
+            if event.key in ARROW_PRESSED:
+                handle_arrow_pressed(event.key, sudoku_board)
+                sudoku_board.highlight_flag = True
+            elif event.key in NUM_PRESSED:
+                handle_number_pressed(event.key, sudoku_board)
+            else:
+                handle_other_keys(event.key, sudoku_board)
 
 
 def handle_mouse_event(sudoku_board):
@@ -70,9 +87,41 @@ def handle_arrow_pressed(arrow_pressed, sudoku_board):
         sudoku_board.y_coord += 1
 
 
-def handle_number_pressed(number_pressed):
+def handle_number_pressed(number_pressed, sudoku_board):
     '''Map the pressed key to an integer value'''
-    return map_key_to_number[number_pressed]
+    num_pressed = map_key_to_number[number_pressed]
+
+    if sudoku_board.defaultgrid[sudoku_board.x_coord][sudoku_board.y_coord] == 0:
+        sudoku_board.updatedgrid[sudoku_board.x_coord][sudoku_board.y_coord] = num_pressed
+
+
+def handle_other_keys(key_pressed, sudoku_board):
+    '''Handle other keys'''
+    if key_pressed == pygame.K_DELETE:
+        if sudoku_board.defaultgrid[sudoku_board.x_coord][sudoku_board.y_coord] == 0:
+            sudoku_board.updatedgrid[sudoku_board.x_coord][sudoku_board.y_coord] = 0
+    elif key_pressed == pygame.K_RETURN:
+        solve_game()
+
+
+def solve_game():
+    '''Solve game if user pressed RETURN key'''
+
+
+def valid_value(grid, x_pos, y_pos, value):
+    '''Check if its possible to put value in given place'''
+    for i in range(0, 9):
+        if grid[x_pos][i] == value:
+            return False
+        if grid[i][y_pos] == value:
+            return False
+    x0 = (x_pos//3)*3
+    y0 = (y_pos//3)*3
+    for i in range(0, 3):
+        for j in range (0, 3):
+            if grid[x0+i][y0+j] == value:
+                return False
+    return True
 
 
 def draw_lines():
@@ -80,8 +129,9 @@ def draw_lines():
     for lines in range(10):
         line_thickness = get_line_thickness(lines)
         line_coord = lines * diff
-        pygame.draw.line(Window, pygame.Color("black"), (0 + 5, line_coord + 5), (SUDOKU_SIZE + 5, line_coord + 5), line_thickness)  # Draw horizontal lines
-        pygame.draw.line(Window, pygame.Color("black"), (line_coord + 5, 0 + 5), (line_coord + 5, SUDOKU_SIZE + 5), line_thickness) # Draw vertical lines
+        pygame.draw.line(Window, pygame.Color("black"), (0 + BOARD_OFFSET, line_coord + BOARD_OFFSET), (SUDOKU_SIZE + BOARD_OFFSET, line_coord + BOARD_OFFSET), line_thickness) # Draw horizontal lines
+        pygame.draw.line(Window, pygame.Color("black"), (line_coord + BOARD_OFFSET, 0 + BOARD_OFFSET), (line_coord + BOARD_OFFSET, SUDOKU_SIZE + BOARD_OFFSET), line_thickness) # Draw vertical lines
+
 
 def get_line_thickness(line):
     '''Return line thickness, every third line should be thicker to separate boxes'''
@@ -92,65 +142,49 @@ def get_line_thickness(line):
     return line_thickness
 
 
-def draw_bg(defaultgrid):
-    for i in range (9):
-        for j in range (9):
-            if defaultgrid[i][j] != 0:
-                pygame.draw.rect(Window, pygame.Color("yellow"), (i * diff, j * diff, diff + 1, diff + 1))
-                number_to_draw = font.render(str(defaultgrid[i][j]), 1, pygame.Color("black"))
-                Window.blit(number_to_draw, (i * diff + 15, j * diff))
+def draw_background(sudoku_board):
+    '''Draw background and numbers'''
+    defaultgrid = sudoku_board.defaultgrid
+    updatedgrid = sudoku_board.updatedgrid
+
+    for row in range (9):
+        for col in range (9):
+            if defaultgrid[row][col] != 0:
+                pygame.draw.rect(Window, pygame.Color("yellow"), (row * diff + BOARD_OFFSET, col * diff + BOARD_OFFSET, diff + 1, diff + 1))
+                draw_number(defaultgrid[row][col], row, col)
+            elif updatedgrid[row][col] != 0:
+                draw_number(updatedgrid[row][col], row, col)
 
 
-def draw_number(value, sudoku_board):
+def draw_number(value, x_coord, y_coord):
+    '''Given a value and coordinates, draw value in those coordinates'''
+    num_offset = 15
     number_to_draw = font.render(str(value), 1, pygame.Color("black"))
-    Window.blit(number_to_draw, (sudoku_board.x_coord * diff + 15 + 20, sudoku_board.y_coord * diff + 15))
+    Window.blit(number_to_draw, (x_coord * diff + num_offset + BOARD_OFFSET, y_coord * diff + BOARD_OFFSET))
 
 
-def highlight_box(xy_coord):
-    x_coord = xy_coord[0]
-    y_coord = xy_coord[1]
-    line_thickness = THICK_LINE
+def highlight_box(sudoku_board):
+    '''Highlight box we are currently on by drawing a square of different color'''
+    if not sudoku_board.highlight_flag:
+        return
 
-    for k in range(2):
-        pygame.draw.line(Window, pygame.Color("blue"), (x_coord * diff - 3, (y_coord + k)*diff), (x_coord * diff + diff + 3, (y_coord + k)*diff), line_thickness) # Horizontal lines
-        pygame.draw.line(Window, pygame.Color("blue"), ((x_coord + k) * diff, y_coord * diff), ((x_coord + k) * diff, y_coord * diff + diff), line_thickness)     # Vertical lines
+    line_width = 3
+    x_hori = sudoku_board.x_coord * diff + BOARD_OFFSET
+    y_vert = sudoku_board.y_coord * diff + BOARD_OFFSET
+    pygame.draw.rect(Window, pygame.Color("red"), (x_hori, y_vert, diff + 1, diff + 1), line_width)
 
 
-def initializeWindow():
+def run_game():
     sudoku_board = SudokuBoard()
-    exit_game = False
-    highlight_flag = False
-    num_pressed = 0
 
-
-    while not exit_game:
+    while not sudoku_board.exit_game:
         Window.fill(pygame.Color("white"))
 
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                exit_game = True
-            
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                handle_mouse_event(sudoku_board)
-                highlight_flag = True
-
-            elif event.type == pygame.KEYDOWN:
-                if event.key in ARROW_PRESSED:
-                    handle_arrow_pressed(event.key, sudoku_board)
-                    highlight_flag = True
-                elif event.key in NUM_PRESSED:
-                    num_pressed = handle_number_pressed(event.key)
-
-        if num_pressed != 0:
-            draw_number(num_pressed, sudoku_board)
-            sudoku_board.defaultgrid[int(sudoku_board.x_coord)][int(sudoku_board.y_coord)] = num_pressed  # TODO: Only do this if num_pressed is allowed
-            num_pressed = 0
-
-        draw_bg(sudoku_board.defaultgrid)
+        handle_events(sudoku_board)
+        draw_background(sudoku_board)
         draw_lines()
+        highlight_box(sudoku_board)
 
-        if highlight_flag:
-            highlight_box([sudoku_board.x_coord, sudoku_board.y_coord])
 
         pygame.display.update()
 
@@ -158,4 +192,4 @@ def initializeWindow():
 
 
 if __name__ == "__main__":
-    initializeWindow()
+    run_game()
