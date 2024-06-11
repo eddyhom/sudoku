@@ -19,21 +19,54 @@ Window = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
 pygame.display.set_caption("SUDOKU GAME")
 font = pygame.font.SysFont("comicsans", NUMBER_FONT_SIZE)
 
+class Button():
+    def __init__(self, x, y, button_text):
+        self.width = 170
+        self.height = 50
+        self.x_pos = x
+        self.y_pos = y
+        self.text = button_text
+        self.button = pygame.Rect(x, y, self.width, self.height)
+        self.button_clicked = False
+        self.last_state = False # TODO: Use this to check for only one click
+
+    def draw(self):
+        # Get Mouse Position
+        pos = pygame.mouse.get_pos()
+        if self.button.collidepoint(pos):
+            pygame.draw.rect(Window, pygame.Color("yellow"), self.button, 0)
+            pygame.draw.rect(Window, pygame.Color("black"), self.button, 4)
+            draw_text = font.render(str(self.text), 1, pygame.Color("red"))
+
+            if pygame.mouse.get_pressed()[0] == 1 and self.button_clicked == False: # 0th index is left click.
+                self.button_clicked = True
+        else:
+            pygame.draw.rect(Window, pygame.Color("black"), self.button, 4)
+            draw_text = font.render(str(self.text), 1, pygame.Color("black"))
+
+        if pygame.mouse.get_pressed()[0] == 0: # 0th index is left click.
+            self.button_clicked = False
+
+        Window.blit(draw_text, (self.x_pos + self.width // 5, self.y_pos - 5))
+
+
+
+
 class SudokuBoard:
     x_coord = 0
     y_coord = 0
     exit_game = False
     highlight_flag = False
     defaultgrid =[
-        [0, 0, 1, 0, 0, 0, 0, 0, 9],
-        [0, 0, 0, 0, 0, 1, 5, 0, 2],
-        [0, 7, 6, 5, 0, 0, 0, 8, 0],
-        [0, 0, 0, 0, 6, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 4, 0, 0, 0],
-        [0, 4, 0, 0, 0, 0, 3, 9, 1],
-        [0, 8, 2, 0, 0, 7, 0, 0, 0],
-        [0, 9, 7, 0, 3, 0, 0, 0, 6],
-        [4, 0, 0, 8, 9, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 6, 0, 0, 0],
+        [0, 0, 5, 0, 9, 0, 0, 0, 8],
+        [0, 6, 0, 5, 0, 2, 7, 0, 4],
+        [0, 0, 8, 0, 0, 0, 0, 0, 9],
+        [3, 4, 0, 0, 8, 0, 0, 0, 7],
+        [6, 5, 0, 0, 0, 0, 0, 1, 2],
+        [0, 1, 2, 9, 0, 0, 3, 0, 0],
+        [5, 8, 0, 4, 0, 0, 9, 7, 0],
+        [9, 0, 0, 0, 0, 0, 0, 8, 6],
     ]
     updatedgrid = copy.deepcopy(defaultgrid)
 
@@ -101,28 +134,94 @@ def handle_other_keys(key_pressed, sudoku_board):
         if sudoku_board.defaultgrid[sudoku_board.x_coord][sudoku_board.y_coord] == 0:
             sudoku_board.updatedgrid[sudoku_board.x_coord][sudoku_board.y_coord] = 0
     elif key_pressed == pygame.K_RETURN:
-        solve_game()
+        solve_game(sudoku_board, 0, 0)
 
 
-def solve_game():
-    '''Solve game if user pressed RETURN key'''
+def solve_game(sudoku_board, i, j):
+    grid = sudoku_board.updatedgrid
+    while grid[i][j] != 0:
+        if i<8:
+            i+= 1
+        elif i == 8 and j<8:
+            i = 0
+            j+= 1
+        elif i == 8 and j == 8:
+            return True
+    
+    pygame.event.pump()
+
+    for it in range(1, 10):
+        if valid_value(grid, i, j, it) == True:
+            grid[i][j]= it
+
+            Window.fill(pygame.Color("white"))
+            draw_background(sudoku_board)
+            draw_lines()
+            pygame.display.update()
+            pygame.time.delay(5)
+
+            if solve_game(sudoku_board, i, j)== 1:
+                return True
+            else:
+                grid[i][j]= 0
+            
+    return False
+
+
+def reset_game(sudoku_board):
+    '''Reset board to original numbers'''
+    sudoku_board.updatedgrid = copy.deepcopy(sudoku_board.defaultgrid)
+
+
+def create_board(sudoku_board):
+    '''Let user create a board'''
+    sudoku_board.defaultgrid = [[0 for _ in sublist] for sublist in sudoku_board.defaultgrid]
+    sudoku_board.updatedgrid = copy.deepcopy(sudoku_board.defaultgrid)
+
 
 
 def valid_value(grid, x_pos, y_pos, value):
-    '''Check if its possible to put value in given place'''
-    for i in range(0, 9):
-        if grid[x_pos][i] == value:
-            return False
-        if grid[i][y_pos] == value:
-            return False
-    x0 = (x_pos//3)*3
-    y0 = (y_pos//3)*3
-    for i in range(0, 3):
-        for j in range (0, 3):
-            if grid[x0+i][y0+j] == value:
-                return False
+    '''Check if value is valid for given place'''
+    if is_duplicate_in_column(grid, x_pos, y_pos, value):
+        return False
+    if is_duplicate_in_row(grid, x_pos, y_pos, value):
+        return False
+    if is_dublicate_in_box(grid, x_pos, y_pos, value):
+        return False
+    
     return True
 
+def is_duplicate_in_column(grid, x_pos, y_pos, value):
+    '''Check for duplicate number in same column'''
+    for i in range(0, 9):
+        if i == y_pos:
+            continue
+        if grid[x_pos][i] == value:
+            return True
+    return False
+
+def is_duplicate_in_row(grid, x_pos, y_pos, value):
+    '''Check for duplicate number in same column'''
+    for i in range(0, 9):
+        if i == x_pos:
+            continue
+        if grid[i][y_pos] == value:
+            return True
+    return False
+    
+        
+def is_dublicate_in_box(grid, x_pos, y_pos, value):
+    '''Check for dublicate numbers in same box'''
+    x_box = (x_pos//3)*3
+    y_box = (y_pos//3)*3
+    for i in range(0, 3):
+        for j in range (0, 3):
+            if x_box+i == x_pos and y_box+j == y_pos:
+                continue
+            if grid[x_box+i][y_box+j] == value:
+                return True
+    return False
+    
 
 def draw_lines():
     '''Draw Horizontal and vertical lines in sudoku, with different thickness'''
@@ -147,19 +246,26 @@ def draw_background(sudoku_board):
     defaultgrid = sudoku_board.defaultgrid
     updatedgrid = sudoku_board.updatedgrid
 
-    for row in range (9):
-        for col in range (9):
-            if defaultgrid[row][col] != 0:
-                pygame.draw.rect(Window, pygame.Color("yellow"), (row * diff + BOARD_OFFSET, col * diff + BOARD_OFFSET, diff + 1, diff + 1))
-                draw_number(defaultgrid[row][col], row, col)
-            elif updatedgrid[row][col] != 0:
-                draw_number(updatedgrid[row][col], row, col)
+    for col in range (9):
+        for row in range (9):
+            if defaultgrid[col][row] != 0:
+                # Draw yellow background to original numbers
+                pygame.draw.rect(Window, pygame.Color("yellow"), (col * diff + BOARD_OFFSET, row * diff + BOARD_OFFSET, diff + 1, diff + 1))
+                
+            if updatedgrid[col][row] != 0:
+                # Draw all numbers
+                is_value_valid = valid_value(updatedgrid, col, row, updatedgrid[col][row])
+                draw_number(updatedgrid[col][row], col, row, is_value_valid)
 
 
-def draw_number(value, x_coord, y_coord):
+def draw_number(value, x_coord, y_coord, valid_num):
     '''Given a value and coordinates, draw value in those coordinates'''
     num_offset = 15
-    number_to_draw = font.render(str(value), 1, pygame.Color("black"))
+    num_color = pygame.Color("black")
+    if not valid_num:
+        num_color = pygame.Color("red")
+
+    number_to_draw = font.render(str(value), 1, num_color)
     Window.blit(number_to_draw, (x_coord * diff + num_offset + BOARD_OFFSET, y_coord * diff + BOARD_OFFSET))
 
 
@@ -176,9 +282,24 @@ def highlight_box(sudoku_board):
 
 def run_game():
     sudoku_board = SudokuBoard()
+    start_button = Button(520, 25, "Solve")
+    reset_button = Button(520, 90, "Reset")
+    create_button = Button(520, 155, "Create")
+
 
     while not sudoku_board.exit_game:
         Window.fill(pygame.Color("white"))
+        start_button.draw()
+        reset_button.draw()
+        create_button.draw()
+
+        # TODO: Fix these, they are being called to many times.
+        if start_button.button_clicked:
+            solve_game(sudoku_board, 0, 0)
+        if reset_button.button_clicked:
+            reset_game(sudoku_board)
+        if create_button.button_clicked:
+            create_board(sudoku_board)
 
         handle_events(sudoku_board)
         draw_background(sudoku_board)
